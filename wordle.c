@@ -11,6 +11,7 @@ typedef struct {
 	int active;
 } word_t;
 int words;
+int numactive;
 word_t wordlist[15000];
 
 int loadwords(char *filename)
@@ -28,6 +29,7 @@ int loadwords(char *filename)
 		wordlist[words].active = 1;
 		words++;
 	};
+	numactive = words;
 
 	fclose(wordfile);
 	return words;
@@ -41,11 +43,13 @@ void resetwords()
 		wordlist[word].active = 1;
 		wordlist[word].score = 0;
 	}
+	numactive = words;
 }
 
 void addletter(int letter, char alpha, enum res_t response)
 {
 	int word, letter2, inword;
+	numactive = 0;
 	for (word = 0; word < words; word++)
 	{
 		if (response == GREEN)
@@ -81,6 +85,8 @@ void addletter(int letter, char alpha, enum res_t response)
 					wordlist[word].active = 0;
 			}
 		}
+		if (wordlist[word].active == 1)
+			numactive++;
 	}
 	return;
 }
@@ -111,6 +117,7 @@ int recalcscores()
 			if (letterscore[letter][wordlist[word].word[letter]] > wordscore[wordlist[word].word[letter]])
 				wordscore[wordlist[word].word[letter]] = letterscore[letter][wordlist[word].word[letter]];
 
+		wordlist[word].score = 0;
 		for (alpha = 0; alpha < 256; alpha++)
 			wordlist[word].score+= wordscore[alpha];
 		if (wordlist[word].active == 0)
@@ -128,13 +135,15 @@ int recalcscores()
 int simulate(char *startword, char *findword)
 {
 	int guess = 0, done = 0;
-	int bestword;
+	int bestword, bestsco = 0;
 	int letter, letter2, inword;
 	char *word;
 	resetwords();
 	word = startword;
+	printf("words  guess  score\n-----  -----  -----\n");
 	do
 	{
+		printf("%5i  ",numactive);
 		guess++;
 		if (!strcmp(word, findword))
 			done = 1;
@@ -143,7 +152,7 @@ int simulate(char *startword, char *findword)
 			if (word[letter] == findword[letter])
 			{
 				addletter(letter, word[letter], GREEN);
-				printf("\033[0;32m");
+				printf("\033[30;42m");
 			}
 			else
 			{
@@ -154,39 +163,38 @@ int simulate(char *startword, char *findword)
 				if (inword == 1)
 				{
 					addletter(letter, word[letter], YELLOW);
-					printf("\033[0;33m");
+					printf("\033[30;43m");
 				}
 				else
 				{
 					addletter(letter, word[letter], GREY);
-					printf("\033[0;37m");
+					printf("\33[0;0m");
 				}
 			}
 			printf("%c", word[letter]);
 		}
-		printf("\n");
+		printf("\33[0;0m%7i\n",bestsco);
 		bestword = recalcscores();
+		bestsco = wordlist[bestword].score;
 		word = wordlist[bestword].word;
 	} while (done == 0);
-
 	return guess;
 }
 
 int main(int argc, char *argv[])
 {
+	int word;
 	srand(time(NULL));
+	loadwords("words.txt");
+	resetwords();
+	recalcscores();
 	if (argc == 2)
 	{
-		loadwords("words.txt");
-		resetwords();
-		return simulate(wordlist[rand() % words].word,argv[1]);
+		do {word = rand() % words;}while (wordlist[word].score < 9000);
+		return simulate(wordlist[word].word,argv[1]);
 	}
 	if (argc == 3)
-	{
-		loadwords("words.txt");
-		resetwords();
 		return simulate(argv[1],argv[2]);
-	}
 	printf("Usage:\n%s <startingguess> <findword>\n",argv[0]);
 	printf("---- Or ----\n");
 	printf("%s <findword>\n",argv[0]);
